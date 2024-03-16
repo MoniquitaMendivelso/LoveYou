@@ -1,0 +1,76 @@
+<?php
+
+class frontController
+{
+    private $action;
+    private $params;
+    public function proccessRequest()
+    {
+        if (isset($_REQUEST["url"])) {
+            $myUrl = explode("/", trim($_REQUEST["url"]));
+            $view = array_shift($myUrl);
+
+            //Validar que llegue api o web
+            //http://localhost/miapi/api/ ó http://localhost/miapi/web/
+            if ($view != "api" && $view != "web")
+                showError("Peticion invalida /: ", "code-1", true);
+            if ($view == "api") {
+                define("CALL_API", true); // Me llamo para el API
+
+            } else {
+                define("CALL_API", false); // Me llamo web
+            }
+
+            if (count($myUrl) == 0 || empty($myUrl[0])) {
+                if (!CALL_API) //si CALL_API es falso llama  DEFAULT_VIEW    
+                    View::render(["view" => DEFAULT_VIEW]); // DEFAULT_VIEW es Login
+                showError("Peticion invalida1", "code-3", true);
+            }
+            $this->action = array_shift($myUrl);
+            $this->params = $myUrl;
+            //print_r($this->params);
+            $result = $this->dispatcher($this->action, $this->params);
+
+            /* 
+            if ($result["result"] == "fail") {
+                $result["view"] = "defaultError";
+            }
+            */
+
+
+            if (CALL_API) // Si el llamado es por API
+            {
+                //print_r(json_encode($result));
+                json_output(json_build(200, $result));
+            } else // Es un llamado para interface WEB
+                //Esta es la gran Magia  
+                //Llamo a la clase que me hace render de la vista View.class.php
+                View::render($result); // en result va la llave VIEW con el nombre de la vista
+        } else {
+            showError("Peticion invalida2", "code-3", true);
+        }
+    }
+
+
+    public function dispatcher($action, $params)
+    {
+        //Arma el nombre del archivo a llamar en http://localhost/miApi/webhttp/actions/
+        $filename = ACTIONS . $action . ".class.php";
+        //print_r($filename);
+        if (is_file($filename)) {
+            require_once $filename;
+            if (!class_exists($action)) {
+                echo "Clase no existe";
+            } else // Si existe
+            {
+                $cmd = new $action();
+                //print_r($params);
+                //print_r($action);
+                return $cmd->execute($params);
+
+            }
+        } else
+            //die("<br>archivo no existe");
+            showError("Peticion Invalida", "code-4", true);
+    }
+}
